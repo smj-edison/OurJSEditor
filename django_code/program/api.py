@@ -148,12 +148,96 @@ def collaborators(request, program_id):
             return api.succeed()
         return api.error("User isn't a collaborator on this program.")
 
+# /api/program/PROG_ID/viewers
+@api.StandardAPIErrors("POST", "DELETE")
+def viewers(request, program_id):
+    requested_program = Program.objects.get(program_id=program_id)
+
+    if not requested_program.is_private:
+            return api.error("Cannot add/remove viewers on a public program.", status=400)
+
+    # Any viewer can add other viewers, but not remove them
+    # Also, you can't add viewers to a public program
+    if not requested_program.is_private or not requested_program.can_user_view(request.user):
+        return api.error("Not authorized.", status=401)    
+
+    # Payload:
+    # {user:{id:""}}
+    # {user:{username:""}}
+    # TODO: Allow getting a user by username *or* id?
+    requested_user_identifier = json.loads(request.body)["user"]
+    try:
+        user = Profile.objects.get(profile_id=requested_user_identifier["id"]).user
+    except KeyError:
+        user = User.objects.get(username=requested_user_identifier["username"])
+
+    if request.method == "POST":
+        # Check if the viewer can alreadt view it
+        # or is the author
+        if requested_program.can_user_view(user):
+            return api.error("That user can already view this program.")
+
+        # Send a notification to the program owner, if it wasn't the author who did the adding
+        if request.user != requested_program.user:
+            Notif.objects.create(
+                target_user=requested_program.user,
+                link="/program/" + requested_program.program_id,
+                description="<strong>{0}</strong> added <strong>{1}</strong> to the list of viewers on your program, <strong>{2}</strong>.".format(
+                    escape(request.user.profile.display_name), escape(user.profile.display_name), escape(requested_program.title)),
+            )
+
+        # Send a notification to the user who has been added
+        # if (request.user != user):
+        Notif.objects.create(
+            target_user=user,
+            link="/program/" + requested_program.program_id,
+            description="<strong>{0}</strong> added you as a viewer on the program, <strong>{1}</strong>.".format(
+                escape(request.user.profile.display_name), escape(requested_program.title)),
+        )
+
+        requested_program.viewers.add(user)
+        return api.succeed({"username": user.username, "id": user.profile.profile_id})
+
+    elif request.method == "DELETE":
+        # only collaborators and creators can remove viewers
+        if not requested_program.can_user_edit(request.user):
+            return api.error("Not authorized.", status=401)
+
+        if requested_program.viewers.filter(id=user.id).exists():
+            # Send a notification to the program owner, if it wasn't the author who did the removing
+            if request.user != requested_program.user:
+                Notif.objects.create(
+                    target_user=requested_program.user, # Program author
+                    link="/program/" + requested_program.program_id,
+                    description="<strong>{0}</strong> removed <strong>{1}</strong> from the list of viewers on your program, <strong>{2}</strong>.".format(
+                        escape(request.user.profile.display_name), escape(user.profile.display_name), escape(requested_program.title)),
+                )
+
+            # Send a notification to the user who was removed, unless they removed themselves
+            if request.user != user:
+                Notif.objects.create(
+                    target_user=user,
+                    link="/program/" + requested_program.program_id,
+                    description="<strong>{0}</strong> removed you from the list of viewers on the program, <strong>{1}</strong>.".format(
+                        escape(request.user.profile.display_name), escape(requested_program.title)),
+                )
+
+            # Other 3rd-party viewers and viewers don't get notifications
+
+            requested_program.viewers.remove(user)
+            return api.succeed()
+
+        return api.error("User isn't a viewer on this program.")
+
 
 # /api/program/PRO_ID
 @api.StandardAPIErrors("GET", "PATCH", "DELETE")
 def program(request, program_id):
     requested_program = Program.objects.get(program_id=program_id)
     if request.method == "GET":
+        if not requested_program.can_user_view(request.user):
+            return api.error("Not authorized.", status=401)
+
         return api.succeed(requested_program.to_dict())
     elif request.method == "PATCH":
         data = json.loads(request.body)
@@ -207,6 +291,13 @@ def program(request, program_id):
         for prop in valid_props:
             if prop in data:
                 setattr(requested_program, prop, data[prop])
+
+        # only the owner can change whether it is private or not
+        if "is_private" in data:
+            if request.user.id != requested_program.user.id:
+                return api.error("Not authorized to change privacy status.", status=401)
+
+            requested_program.is_private = data["is_private"]
 
         requested_program.save()
 

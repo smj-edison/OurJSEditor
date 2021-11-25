@@ -17,6 +17,9 @@ def program_vote(request, program_id):
         return api.error("Invalid vote type.")
     try:
         voted_program = Program.objects.get(program_id=program_id)
+        if not voted_program.can_user_view(request.user):
+            return api.error("Not authorized.", status=401)
+
         orig_votes = getattr(voted_program, vote_type + "_votes")
 
         # Look for a vote of the same type cast by the user before

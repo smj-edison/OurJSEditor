@@ -36,6 +36,7 @@ api_urls = [
             re_path(r'^$', program_api.program, name="program-api"),
             re_path(r'^/forks$', program_api.forks, name="program-forks-api"),
             re_path(r'^/collaborators$', program_api.collaborators, name="program-collaborators-api"),
+            re_path(r'^/viewers$', program_api.viewers, name="program-viewers-api"),
             re_path(r'^/comments$', comment_api.program_comments, name="progrom-comments-api"),
             re_path(r'^/comment/', include([
                 re_path(r'^new$', comment_api.new_comment, name="new-comment-api"),

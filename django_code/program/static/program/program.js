@@ -715,105 +715,6 @@ function hashUpdated() {
     }
 }
 
-//Creates and returns a DOM element representing a row in the collaborator popup, with buttons and stuff
-function makeCollaboratorRow(identifier) {
-    var item = document.createElement("li");
-
-    //Create the remove icon/button if we can edit the program
-    if (programData.canEditProgram ) {
-        var removeIcon = document.createElement("span");
-        removeIcon.classList.add("icon", "icon-delete", "clickable");
-        removeIcon.addEventListener("click", function () {
-            //Double check if they're about to remove themselves
-            if (userData.id === item.dataset.userId) {
-                if (!confirm("You're about to remove yourself from the collaborators on this program.\nYou can't undo this action.")) {
-                    return;
-                }
-            }
-
-            //Make a request to remove the user
-            makeRequest("DELETE", "/api/program/" + programData.id + "/collaborators", function (data) {
-                //Mutate programData
-                for (var i = 0; i < programData.collaborators.length; i++) {
-                    if (programData.collaborators[i] === item.dataset.userId) {
-                        programData.collaborators.splice(i, 1);
-                    }
-                }
-                //If you just removed yourself, refresh everything
-                if (userData.id === item.dataset.userId) {
-                    window.location.reload();
-                }else {
-                    //Remove from the DOM
-                    item.parentElement.removeChild(item);
-                }
-            }, {action: "Removing collaborator " + identifier, data: {user: {id: item.dataset.userId}}});
-        });
-        item.appendChild(removeIcon);
-    }
-
-    makeRequest("GET", "/api/user/" + identifier, function (data) {
-        item.appendChild(document.createTextNode("@" + data.username));
-        item.dataset.userId = data.id;
-    }, {action: "Displaying collaborator " + identifier});
-    return item;
-}
-
-function addCollaborator(username) {
-    //Silently ignore empty textbox/input
-    if (username.length === 0) {
-        return;
-    }
-    //Make a request to add the user (backend verifies user)
-    makeRequest("POST", "/api/program/" + programData.id + "/collaborators", function (data) {
-        var collaboratorsList = document.getElementById("collaborators");
-        collaboratorsList.insertBefore(makeCollaboratorRow(username), collaboratorsList.firstElementChild.nextElementSibling);
-
-        //Add the new collaborator to the local list
-        programData.collaborators.push(data.id);
-    }, {
-        data: {user: {username: username}},
-        action: "Adding collaborator \"" + username + "\"",
-    });
-}
-
-function createCollaboratePopup() {
-    var collaboratePopup = document.getElementById("collaborate-popup");
-
-    //If we're not the program owner or a collaborator, remove the textbox to add collaborators
-    //Collaborators can add or remove any other collaborators
-    if (!programData.canEditProgram || programData.unsaved) {
-        var addCollaboratorLi = document.getElementById("add-collaborator");
-        addCollaboratorLi.parentElement.removeChild(addCollaboratorLi);
-    }else {
-        var collaboratorTextbox = document.getElementById("add-collaborator-textbox");
-        collaboratorTextbox.addEventListener("keypress", function (e) {
-            if (e.key === "Enter" || e.keyCode === 13) {
-                addCollaborator(collaboratorTextbox.value);
-                collaboratorTextbox.value = "";
-            }
-        });
-
-        var addCollaboratorButton = document.getElementById("add-collaborator-button");
-        addCollaboratorButton.addEventListener("click", function () {
-            addCollaborator(collaboratorTextbox.value);
-            collaboratorTextbox.value = "";
-        });
-    }
-
-    document.getElementById("close-button-wrap").addEventListener("click", function () {
-        collaboratePopup.style.display = "none";
-    });
-
-    //The popup actually lives inside the button in the DOM tree. This stops clicks on the popup from propagating up to the button
-    collaboratePopup.addEventListener("click", function (e) { e.stopImmediatePropagation(); });
-
-    var collaboratorsList = document.getElementById("collaborators");
-    var collaborators = programData.collaborators;
-    for (var i = 0; i < collaborators.length; i++) {
-        collaboratorsList.appendChild(makeCollaboratorRow(collaborators[i]));
-    }
-}
-
 //Takes a string, either `tabbed` or `split`
 function switchEditorLayout (newLayout) {
     // If the layout matches, do nothing (console.warn?)
@@ -1090,11 +991,13 @@ function vote () {
     }));
 }
 
-function save (fork) {
+function save (fork, isPrivate) {
+    let isPrivateJson = {};
+
     //Update programData with the latest textbox code
     programData.js = jsEditor.getValue();
     programData.css = cssEditor.getValue();
-    programData.html = htmlEditor.getValue();
+    programData.html = htmlEditor.getValue();    
 
     var req = new XMLHttpRequest();
     req.addEventListener("load", function (evt) {
@@ -1125,12 +1028,20 @@ function save (fork) {
     }
     req.setRequestHeader("X-CSRFToken", csrf_token);
     req.setRequestHeader("Content-Type", "application/json");
-    req.send(JSON.stringify({
+
+    var toSend = {
         "title" : programData.title,
         "js" : programData.js,
         "css" : programData.css,
         "html" : programData.html,
-    }));
+        ...isPrivateJson
+    }; 
+
+    if (isPrivate !== undefined) {
+        toSend.is_private = isPrivate;
+    }
+
+    req.send(JSON.stringify(toSend));
 }
 
 document.addEventListener("DOMContentLoaded", function() {
@@ -1234,29 +1145,31 @@ document.addEventListener("DOMContentLoaded", function() {
             }
         )
     );
-
     
-    document.getElementById("run-button").addEventListener("click", runProgram);
-    document.getElementById("save-button").addEventListener("click", function (e) {
-        e.preventDefault();
-        save(false);
-    });
-    document.getElementById("fork-button").addEventListener("click", function (e) {
-        e.preventDefault();
-        save(true);
-    });
-    document.getElementById("delete-button").addEventListener("click", function (e) {
-        openConfirm(e, "delete-confirm");
-    });
-    document.getElementById("publish-button").addEventListener("click", function (e) {
-        document.getElementById("preview").contentWindow.postMessage(JSON.stringify({
-            type: "thumbnail-request"
-        }), "*");
-
-        window.addEventListener("message", imageReceived, false);
-
-        openConfirm(e, "publish-confirm");
-    });
+    window.interopWithReact = {
+        runButton: runProgram,
+        save: save,
+        saveButton: function (e) {
+            e.preventDefault();
+            save(false);
+        },
+        forkButton: function (e) {
+            e.preventDefault();
+            save(true);
+        },
+        deleteButton: function (e) {
+            openConfirm(e, "delete-confirm");
+        },
+        publishButton: function (e) {
+            document.getElementById("preview").contentWindow.postMessage(JSON.stringify({
+                type: "thumbnail-request"
+            }), "*");
+    
+            window.addEventListener("message", imageReceived, false);
+    
+            openConfirm(e, "publish-confirm");
+        }
+    };
 
     document.getElementById("delete-cancel-button").addEventListener("click", closeConfirm);
     document.getElementById("publish-cancel-button").addEventListener("click", closeConfirm);
@@ -1352,19 +1265,6 @@ document.addEventListener("DOMContentLoaded", function() {
 
         //Set View Fullscreen link
         document.getElementById("view-fullscreen-link").href = "/program/" + programData.id + "/fullscreen";
-
-        //Create the collaborator popup and button
-        createCollaboratePopup();
-        document.getElementById("collaborate-button").addEventListener("click", function(e) {
-            e.preventDefault();
-
-            var collaboratePopup = document.getElementById("collaborate-popup");
-            if (collaboratePopup.style.display === "block") {
-                collaboratePopup.style.display = "none";
-            }else {
-                collaboratePopup.style.display = "block";
-            }
-        });
     }else {
         //Page elements that get removed on a new program page
         var toRemove = ["vote-table", "comment-wrap", "updated-date", "view-fullscreen", "program-author", "fork-button", "collaborate-button"];

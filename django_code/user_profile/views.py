@@ -21,7 +21,12 @@ def index(request, username):
             'sort': 'new' if user == request.user else 'top' # If you're looking at your own profile, show new programs
         }
 
-        programs = get_programs(list_options['sort'], Q(user=user), published_only=False, initial_load=True)
+        programs = get_programs(
+            list_options['sort'],
+            Q(user=user),
+            published_only=False,
+            initial_load=True,
+            request_user=request.user)
         program_dicts = [p.to_dict(include_code=False) for p in programs]
 
         list_options["initialPrograms"] = program_dicts

@@ -255,16 +255,20 @@ body {
     cursor: pointer;
     transition: all 0.3s;
 }
+
+.run-button > a:nth-child(1),
 #run-button > a:nth-child(1) {
-    font-weight: bold;
-    color: rgb(53, 185, 66);
+    font-weight: bold !important;
+    color: rgb(53, 185, 66) !important;
 }
 
+.run-button > a:nth-child(1):hover,
 #run-button > a:nth-child(1):hover {
     border-bottom: 2px solid rgb(53, 185, 66);
 }
 
 /* Hover red on the delete button */
+.delete-button > a:nth-child(1):hover,
 #delete-button > a:nth-child(1):hover {
     border-bottom: 2px solid rgb(185, 53, 53);
     color: rgb(185, 53, 53);
@@ -301,7 +305,7 @@ body {
     position: relative;
 }
 
-#collaborate-popup {
+#collaborate-popup, .collaborate-popup {
     position: absolute;
     background: white;
     border-radius: 5px;
@@ -312,7 +316,7 @@ body {
     font-size: 15px;
 }
 
-#collaborate-popup #close-button-wrap {
+#collaborate-popup #close-button-wrap, .collaborate-popup .close-button-wrap {
     position: absolute;
     margin: 5px;
     width: 1em;
@@ -320,7 +324,7 @@ body {
     line-height: 1em;
 }
 
-#collaborate-popup .wrapper {
+#collaborate-popup .wrapper, .collaborate-popup .wrapper {
     width: 100%;
     display: inline-block;
     padding: 15px;
@@ -330,12 +334,12 @@ body {
     text-align: center;
 }
 
-#collaborate-popup .header {
+#collaborate-popup .header, .collaborate-popup .header {
     margin-bottom: 5px;
     font-weight: bold;
 }
 
-#collaborate-popup ul {
+#collaborate-popup ul, .collaborate-popup ul {
     padding: 0;
     text-align: left;
     height: 156px;
@@ -344,13 +348,13 @@ body {
 
 }
 
-#collaborate-popup li {
+#collaborate-popup li, .collaborate-popup li {
     background: none;
-    list-style: inside none;
-    float: none;
+    list-style: inside none !important;
+    float: none !important;
 }
 
-#collaborate-popup ul .icon {
+#collaborate-popup ul .icon, .collaborate-popup ul .icon {
     margin-right: 5px;
 }
 
@@ -375,7 +379,7 @@ body {
     cursor: pointer;
 }
 
-#add-collaborator-textbox {
+#add-collaborator-textbox, .add-collaborator-textbox {
     width: 200px;
     margin-right: -5px;
 }
@@ -408,6 +412,10 @@ body {
     box-shadow: 0px 0px 10px 10px rgba(0, 0, 0, 0.1);
     border-radius: 5px;
     font-size: 15px;
+}
+
+.confirm-info input[type="checkbox"] {
+    width: initial;
 }
 
 .confirm-buttons {

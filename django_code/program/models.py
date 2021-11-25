@@ -33,6 +33,8 @@ class Program(models.Model):
     created = models.DateTimeField(auto_now_add=True)
     parent = models.ForeignKey('self', on_delete=models.SET_NULL, blank=True, null=True) # The program this is a fork of
     collaborators = models.ManyToManyField(User, related_name="+")
+    viewers = models.ManyToManyField(User, related_name="+")
+    is_private = models.BooleanField(blank=True, default=False)
 
     last_published = models.DateTimeField(blank=True, null=True)
     published_message = models.CharField(max_length=100, blank=True)
@@ -51,6 +53,13 @@ class Program(models.Model):
         return (
             self.user == user or
             self.collaborators.filter(id=user.id).exists()
+        )
+
+    def can_user_view(self, user):
+        return not self.is_private or (
+            self.user == user or
+            self.collaborators.filter(id=user.id).exists() or
+            self.viewers.filter(id=user.id).exists()
         )
 
     def to_dict(self, include_code=True):
@@ -76,12 +85,15 @@ class Program(models.Model):
             "created": self.created.replace(microsecond=0).isoformat() + "Z",
             "parent": parent,
 
+            "is_private": self.is_private,
+
             "title": self.title,
 
             "lastPublished": last_published,
             "thumbnailUrl": self.image.url,
 
             "collaborators": list(self.collaborators.values_list("profile__profile_id", flat=True)),
+            "viewers": list(self.viewers.values_list("profile__profile_id", flat=True)),
 
             "votes": {t: getattr(self, t + "_votes") for t in vote_types}
         }
@@ -104,7 +116,7 @@ PROGRAMS_PER_PAGE = 20
 
 # filters is a Q object
 # e.g. get_programs("top", Q(author=User.objects.get(username="Matthias")), published_only=True)
-def get_programs(sort, filters=None, offset=0, limit=PROGRAMS_PER_PAGE, published_only=True, initial_load=False):
+def get_programs(sort, filters=None, offset=0, limit=PROGRAMS_PER_PAGE, published_only=True, initial_load=False, request_user=None):
     programs = Program.objects
 
     # None is the case where limit isn't passed
@@ -126,6 +138,15 @@ def get_programs(sort, filters=None, offset=0, limit=PROGRAMS_PER_PAGE, publishe
 
     if filters:
         programs = programs.filter(filters)
+
+    # if it's an anonymous user, private programs are automatically filtered out
+    if request_user == None:
+        programs = programs.filter(is_private=False)
+    else:
+        # TODO: this could possibly be used in a DDoS attack
+        # TODO: there is probably a better way to do this
+        program_ids = [program.program_id for program in programs if program.can_user_view(request_user)]
+        programs = programs.filter(program_id__in=program_ids)
 
     # Maps public names (top, new, hot, entertaining, etc.) to names the database understands (total_votes, created, hotness?, entertaining_votes)
     if sort == "top":

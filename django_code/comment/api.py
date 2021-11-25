@@ -17,6 +17,10 @@ from .models import Comment
 def new_comment(request, program_id):
     data = json.loads(request.body)
 
+    program = Program.objects.get(program_id=program_id)
+    if not program.can_user_view(request.user):
+        return api.error("Not authorized.", status=401)
+
     # A JSON of `null` gets parsed into a Python of `None`
     # If parent isn't passed, KeyError, caught by StandardAPIErrors
     parent_comment = data["parent"]
@@ -35,8 +39,6 @@ def new_comment(request, program_id):
     if parent_comment is not None:
         parent_comment.reply_count += 1
         parent_comment.save()
-
-    program = Program.objects.get(program_id=program_id)
 
     created_comment = Comment.objects.create(
         user=request.user,
@@ -108,6 +110,10 @@ def comment(request, *args):
 
         requested_comment = Comment.objects.get(program_id=program_id, comment_id=comment_id)
 
+    program = requested_comment.program
+    if not program.can_user_view(request.user):
+        return api.error("Not authorized.", status=401)
+
     if request.method == "GET":
         return api.succeed(requested_comment.to_dict())
 
@@ -146,11 +152,18 @@ def comment(request, *args):
 def comment_comments(request, *args):
     if len(args) == 1:
         comment_id = args[0]
+    elif len(args) == 2:
+        comment_id = args[1]
 
+    # check if the comments are from a private program
+    program_of_comments = Comment.objects.get(comment_id=comment_id).program
+    if not program_of_comments.can_user_view(request.user):
+        return api.error("Not authorized.", status=401)
+
+    if len(args) == 1:
         comments = Comment.objects.select_related("user__profile").filter(parent__comment_id=comment_id).order_by("created")
     elif len(args) == 2:
         program_id = args[0]
-        comment_id = args[1]
 
         comments = Comment.objects.select_related("user__profile").filter(program_id=program_id, parent__comment_id=comment_id).order_by("created")
 
@@ -163,6 +176,10 @@ def comment_comments(request, *args):
 # /program/PRO_ID/comments
 @api.StandardAPIErrors("GET")
 def program_comments(request, program_id):
+    program = Program.objects.get(program_id=program_id)
+    if not program.can_user_view(request.user):
+        return api.error("Not authorized.", status=401)
+
     comments = list(Comment.objects.select_related("user__profile").filter(program_id=program_id, depth=0).order_by("-created"))
     return api.succeed({
         "comments": [c.to_dict() for c in comments]

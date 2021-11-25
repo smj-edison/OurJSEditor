@@ -24,32 +24,7 @@
     <link rel="stylesheet" href="{% static 'program/program.css' %}" type="text/css">
 </head>
 <body>
-    <nav class="navbar navbar-default">
-        <!-- Collect the nav links, forms, and other content for toggling -->
-        <div id="toolbar">
-            <ul class="nav navbar-nav">
-                <li id="run-button"><a><span class="icon icon-run"></span> Run</a></li>
-                <li id="collaborate-button">
-                    <a><span class="icon icon-user-plus"></span> Collaborate</a>
-                    <div id="collaborate-popup" class="popup" style="display: none">
-                        <div id="close-button-wrap"><span class="icon icon-cancel clickable"></span></div>
-                        <div class="wrapper">
-                            <div class="header">Collaborators</div>
-                            <ul id="collaborators">
-                                <li id="add-collaborator">
-                                    <span class="icon icon-user-plus clickable" id="add-collaborator-button"></span> <input type="text" id="add-collaborator-textbox"  placeholder="Add collaborator by username">
-                                </li>
-                            </ul>
-                        </div>
-                    </div>
-                </li>
-                <li id="save-button"><a><span class="icon icon-save"></span> Save</a></li>
-                <li id="publish-button"><a><span class="icon icon-bell"></span> Publish</a></li>
-                <li id="fork-button"><a><span class="icon icon-flow-split"></span>Fork</a></li>
-                <li id="delete-button"><a><span class="icon icon-delete"></span> Delete</a></li>
-            </ul>
-        </div><!-- /.navbar-collapse -->
-    </nav>
+    <div id="program-menu"></div> <!-- for preact -->
 
     <!-- Sidebar -->
     <div id="sidebar">
@@ -165,5 +140,6 @@
             throw e;
         }
     </script>
+    <script src="{% static 'jsx-components/program-menu.js' %}"></script>
 </body>
 </html>

@@ -119,7 +119,13 @@ def program_list(request, user_id, sort):
     limit = get_as_int(request.GET, "limit")
 
     try:
-        programs = get_programs(sort, Q(user=requested_user), offset=offset, limit=limit, published_only=False)
+        programs = get_programs(
+            sort,
+            Q(user=requested_user),
+            offset=offset,
+            limit=limit,
+            published_only=False,
+            request_user=request.user)
     except ValueError as err:
         return api.error(str(err))
 
